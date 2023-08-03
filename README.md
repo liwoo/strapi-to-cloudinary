@@ -29,8 +29,8 @@ The script requires the following environment variables:
 
 ```dotenv
 CLOUDINARY_URL=<your_cloudinary_url>
-API_KEY=<your_api_key>
-API_SECRET=<your_api_secret>
+CLOUDINARY_API_KEY=<your_api_key>
+CLOUDINARY_API_SECRET=<your_api_secret>
 BASE_URL=<base_url_of_your_api>
 AUTH_TOKEN=<your_api_auth_token>
 CHUNK_SIZE=<number_of_images_per_chunk>
