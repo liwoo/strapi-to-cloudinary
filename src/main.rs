@@ -1,5 +1,5 @@
 use std::env;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use dotenv::dotenv;
 use reqwest::header;
@@ -8,54 +8,16 @@ use sha1::{Digest, Sha1};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[derive(Clone)]
-pub struct Format {
-    pub ext: String,
-    pub url: String,
-    pub hash: String,
-    pub mime: String,
-    pub name: String,
-    pub path: String,
-    pub size: f64,
-    pub width: i32,
-    pub height: i32,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[derive(Clone)]
-pub struct Formats {
-    pub small: Format,
-    pub thumbnail: Format,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[derive(Clone)]
 pub struct Image {
     pub id: i32,
     #[serde(rename = "name")]
     pub name: String,
-    #[serde(rename = "alternativeText")]
-    pub alternative_text: Option<String>,
-    pub caption: Option<String>,
-    pub width: i32,
-    pub height: i32,
-    pub formats: Formats,
-    #[serde(rename = "hash")]
-    pub hash: String,
-    pub ext: String,
-    pub mime: String,
-    pub size: f64,
     #[serde(rename = "url")]
     pub url: String,
     #[serde(rename = "previewUrl")]
     pub preview_url: Option<String>,
-    pub provider: String,
-    pub provider_metadata: Option<String>,
-    #[serde(rename = "createdAt")]
-    pub created_at: String,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
-    pub blurhash: String,
-    pub placeholder: String,
 }
 
 #[tokio::main]
@@ -79,12 +41,16 @@ async fn main() {
         .header(header::AUTHORIZATION, &authorization_header)
         .send()
         .await;
-
+    
     match response {
         Ok(response) => {
             let response = response.json::<Vec<Image>>().await;
             match response {
                 Ok(response) => {
+                    let total = response.len();
+                    let mut uploaded_files = 0;
+                    println!("Starting to Upload {} files", total);
+                    
                     let parsed_chunk_size = chunk_size.parse::<usize>();
 
                     if parsed_chunk_size.is_err() {
@@ -96,6 +62,7 @@ async fn main() {
                         .map(|chunk| chunk.to_vec())
                         .collect::<Vec<_>>();
 
+                    let start = Instant::now();
                     for chunk in chunks {
                         let tasks: Vec<_> = chunk
                             .into_iter()
@@ -129,7 +96,11 @@ async fn main() {
 
                         for result in results {
                             match result {
-                                Ok(_) => println!("Upload successful"),
+                                Ok(_) => {
+                                    uploaded_files += 1;
+                                    let duration = start.elapsed();
+                                    println!("Upload {} of {} successful after {}", uploaded_files, total, duration.as_secs_f32());
+                                }
                                 Err(e) => println!("Error: {:?}", e),
                             }
                         }
@@ -168,6 +139,7 @@ async fn upload_to_cloudinary(
         .await?;
 
     let image_base64 = base64::encode(&image_data);
+    //TODO: Some images are not jpg, so we need to figure out how to handle that
     let image_base64_for_cloudinary = format!("data:image/jpg;base64,{}", image_base64);
 
     let signature = generate_signature(
